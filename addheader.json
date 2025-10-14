@@ -1,0 +1,187 @@
+{
+  "default": {
+    "template": "# {path}\n",
+    "insert": "start",
+    "action": "add"
+  },
+  "rules": [
+    {
+      "extensions": [
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "bmp",
+        "ico",
+        "pdf",
+        "zip",
+        "gz",
+        "tgz",
+        "bz2",
+        "xz",
+        "7z",
+        "rar",
+        "tar",
+        "mp3",
+        "mp4",
+        "mov",
+        "avi",
+        "webm",
+        "mkv",
+        "ogg",
+        "ogv",
+        "wav",
+        "flac",
+        "woff",
+        "woff2",
+        "ttf",
+        "eot",
+        "otf",
+        "class",
+        "jar",
+        "wasm"
+      ],
+      "action": "skip"
+    },
+    {
+      "extensions": ["json", "json5", "jsonc", "lock", "geojson", "ipynb"],
+      "action": "skip"
+    },
+    {
+      "extensions": ["php", "phtml", ".blade.php"],
+      "action": "skip"
+    },
+    {
+      "extensions": [
+        "ts",
+        "tsx",
+        "js",
+        "jsx",
+        "cjs",
+        "mjs",
+        "cts",
+        "mts",
+        "java",
+        "kt",
+        "kts",
+        "swift",
+        "go",
+        "rs",
+        "dart",
+        "scala",
+        "c",
+        "cc",
+        "cpp",
+        "cxx",
+        "h",
+        "hh",
+        "hpp",
+        "hxx",
+        "cs",
+        "fs",
+        "fsx",
+        "m",
+        "mm",
+        "ino",
+        "proto",
+        "gradle",
+        "groovy",
+        "zig"
+      ],
+      "template": "// {path}\n"
+    },
+    {
+      "extensions": [
+        "py",
+        "rb",
+        "pl",
+        "pm",
+        "r",
+        "sh",
+        "bash",
+        "zsh",
+        "ksh",
+        "fish",
+        "nu",
+        "csh",
+        "ps1",
+        "psm1"
+      ],
+      "template": "# {path}\n",
+      "insert": "afterShebang",
+      "detect": [
+        {
+          "type": "withinFirstLines",
+          "value": "# {path}",
+          "lines": 3
+        }
+      ]
+    },
+    {
+      "extensions": ["lua"],
+      "template": "-- {path}\n",
+      "insert": "afterShebang",
+      "detect": [
+        {
+          "type": "withinFirstLines",
+          "value": "-- {path}",
+          "lines": 3
+        }
+      ]
+    },
+    {
+      "extensions": ["hs", "lhs", "elm", "sql", "psql", "pgsql", "mysql", "sqlite", "hql"],
+      "template": "-- {path}\n"
+    },
+    {
+      "extensions": ["md"],
+      "template": "<!-- {path} -->\n\n"
+    },
+    {
+      "extensions": ["mdc"],
+      "template": [
+        "---",
+        "description: |",
+        "  `// {path}`",
+        "  ... restante da descrição ...",
+        "",
+        "globs: ['*']",
+        "alwaysApply: true",
+        "---",
+        ""
+      ],
+      "detect": [
+        { "type": "startsWith", "value": "---" },
+        { "type": "includes", "value": "`// {path}`" }
+      ]
+    },
+    {
+      "extensions": ["html", "htm", "xml", "xhtml", "svg", "vue", "svelte"],
+      "template": "<!-- {path} -->\n"
+    },
+    {
+      "extensions": ["css", "scss", "less", "sass", "styl", "pcss"],
+      "template": "/* {path} */\n\n"
+    },
+    {
+      "extensions": ["yml", "yaml", "toml", "ini", "cfg", "conf", "properties", "env", "dotenv", "gql", "graphql"],
+      "template": "# {path}\n"
+    },
+    {
+      "filenames": ["Makefile"],
+      "template": "# {path}\n"
+    },
+    {
+      "filenames": ["Dockerfile", "Containerfile"],
+      "template": "# {path}\n"
+    },
+    {
+      "extensions": ["tex", "cls", "sty"],
+      "template": "% {path}\n"
+    },
+    {
+      "extensions": ["clj", "cljs", "edn", "lisp", "scm", "rkt"],
+      "template": "; {path}\n"
+    }
+  ]
+}
