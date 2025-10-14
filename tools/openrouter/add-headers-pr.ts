@@ -9,31 +9,36 @@ const ROOT = execSync('git rev-parse --show-toplevel').toString().trim();
 const BASE = process.env.PR_BASE_SHA ?? 'origin/HEAD~1';
 const HEAD = process.env.PR_HEAD_SHA ?? 'HEAD';
 
-const ALLOWED = [
-  '.ts', '.tsx', '.js', '.jsx', '.md', '.yaml', '.yml', '.mdc', '.sh', '.bash', '.zsh', 'Makefile'
-];
-
-function listChangedFiles(): string[] {
-  const out = execSync(`git diff --name-only --diff-filter=ACMRT ${BASE}..${HEAD}`).toString().split('\n').filter(Boolean);
-  return out.filter(p => {
-    if (p.includes('/node_modules/')) return false;
-    if (p.startsWith('.git/')) return false;
-    if (p.endsWith('.png') || p.endsWith('.jpg') || p.endsWith('.jpeg') || p.endsWith('.svg') || p.endsWith('.ico') || p.endsWith('.gif') || p.endsWith('.pdf')) return false;
-    if (p.endsWith('.map') || p.endsWith('.lock')) return false;
-    const isMakefile = p.split('/').pop() === 'Makefile';
-    if (isMakefile) return true;
-    return ALLOWED.some(ext => p.endsWith(ext));
-  });
+export function shouldProcessPath(p: string): boolean {
+  if (p.startsWith('node_modules/') || p.includes('/node_modules/')) return false;
+  if (p.startsWith('.git/')) return false;
+  if (p.endsWith('.png') || p.endsWith('.jpg') || p.endsWith('.jpeg') || p.endsWith('.svg') || p.endsWith('.ico') || p.endsWith('.gif') || p.endsWith('.pdf')) return false;
+  if (p.endsWith('.map') || p.endsWith('.lock')) return false;
+  return true;
 }
 
-function loadIgnore(): (path: string) => boolean {
-  const addHeaderPath = join(ROOT, '.addheader');
-  if (!existsSync(addHeaderPath)) {
-    const ig = ignore();
+export function listChangedFiles({
+  base = BASE,
+  head = HEAD,
+  cwd = ROOT
+}: { base?: string; head?: string; cwd?: string } = {}): string[] {
+  const out = execSync(`git diff --name-only --diff-filter=ACMRT ${base}..${head}`, { cwd })
+    .toString()
+    .split('\n')
+    .filter(Boolean);
+  return out.filter(shouldProcessPath);
+}
+
+export function loadIgnore(root: string = ROOT): (path: string) => boolean {
+  const candidates = ['.addheaderignore', '.addheader'];
+  for (const file of candidates) {
+    const addHeaderPath = join(root, file);
+    if (!existsSync(addHeaderPath)) continue;
+    const patterns = readFileSync(addHeaderPath, 'utf8');
+    const ig = ignore().add(patterns.split('\n'));
     return (p: string) => ig.ignores(p);
   }
-  const patterns = readFileSync(addHeaderPath, 'utf8');
-  const ig = ignore().add(patterns.split('\n'));
+  const ig = ignore();
   return (p: string) => ig.ignores(p);
 }
 
@@ -123,13 +128,18 @@ async function viaOpenRouter(rel: string, content: string, target: string): Prom
   return txt;
 }
 
-async function main() {
-  const ignores = loadIgnore();
-  const changed = listChangedFiles().filter(p => !ignores(p));
+export async function run({
+  root = ROOT,
+  base = BASE,
+  head = HEAD,
+  changedFiles
+}: { root?: string; base?: string; head?: string; changedFiles?: string[] } = {}): Promise<number> {
+  const ignores = loadIgnore(root);
+  const changed = (changedFiles ?? listChangedFiles({ base, head, cwd: root })).filter(p => !ignores(p));
   let edits = 0;
 
   for (const rel of changed) {
-    const abs = join(ROOT, rel);
+    const abs = join(root, rel);
     if (!existsSync(abs)) continue;
     const original = readFileSync(abs, 'utf8');
     if (hasHeader(rel, original)) continue;
@@ -140,11 +150,16 @@ async function main() {
 
     if (maybe !== original) {
       writeFileSync(abs, maybe, 'utf8');
-      execSync(`git add "${rel}"`);
+      execSync(`git add "${rel}"`, { cwd: root });
       edits++;
     }
   }
 
+  return edits;
+}
+
+export async function main() {
+  const edits = await run();
   if (edits === 0) {
     console.log('Nenhuma alteração necessária nos arquivos do PR.');
   } else {
@@ -152,7 +167,9 @@ async function main() {
   }
 }
 
-main().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch(err => {
+    console.error(err);
+    process.exit(1);
+  });
+}
