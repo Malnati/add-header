@@ -27,11 +27,11 @@ export function loadIgnore(root: string = ROOT): (path: string) => boolean {
     const addHeaderPath = join(root, file);
     if (!existsSync(addHeaderPath)) continue;
     const patterns = readFileSync(addHeaderPath, 'utf8');
-    const ig = ignore().add(patterns.split('\n'));
-    return (p: string) => ig.ignores(p);
+    const ig = ignore().add(patterns);
+    return (p: string) => ig.ignores(p.replace(/\\/g, '/'));
   }
   const ig = ignore();
-  return (p: string) => ig.ignores(p);
+  return (p: string) => ig.ignores(p.replace(/\\/g, '/'));
 }
 
 function expectedHeader(rel: string, content: string): { header: string; insertAt: number } {

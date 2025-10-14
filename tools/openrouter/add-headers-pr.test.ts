@@ -57,6 +57,19 @@ describe('loadIgnore', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  test('supports negated patterns to re-incluir arquivos específicos', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'add-header-negation-'));
+    try {
+      const patterns = ['*.json', '!package.json'];
+      writeFileSync(join(dir, '.addheaderignore'), patterns.join('\n'));
+      const ignores = loadIgnore(dir);
+      assert.equal(ignores('config/settings.json'), true);
+      assert.equal(ignores('package.json'), false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 test('adds headers to non-ignored files and skips ignored ones (e2e)', async () => {
@@ -67,14 +80,15 @@ test('adds headers to non-ignored files and skips ignored ones (e2e)', async () 
     execSync('git config user.email "ci@example.com"', { cwd: repo });
     execSync('git config user.name "CI"', { cwd: repo });
 
-    writeFileSync(join(repo, '.addheaderignore'), 'ignored.txt\n');
+    writeFileSync(join(repo, '.addheaderignore'), ['ignored.txt', '*.json'].join('\n'));
     execSync('git add .', { cwd: repo });
     execSync('git commit -m "initial"', { cwd: repo });
     const base = execSync('git rev-parse HEAD', { cwd: repo }).toString().trim();
 
     writeFileSync(join(repo, 'observed.ts'), "console.log('hello');\n");
     writeFileSync(join(repo, 'ignored.txt'), 'sem cabecalho\n');
-    execSync('git add observed.ts ignored.txt', { cwd: repo });
+    writeFileSync(join(repo, 'config.json'), '{"name":"teste"}\n');
+    execSync('git add observed.ts ignored.txt config.json', { cwd: repo });
     execSync('git commit -m "add files"', { cwd: repo });
     const head = execSync('git rev-parse HEAD', { cwd: repo }).toString().trim();
 
@@ -82,9 +96,11 @@ test('adds headers to non-ignored files and skips ignored ones (e2e)', async () 
 
     const observed = readFileSync(join(repo, 'observed.ts'), 'utf8');
     const ignored = readFileSync(join(repo, 'ignored.txt'), 'utf8');
+    const config = readFileSync(join(repo, 'config.json'), 'utf8');
 
     assert.match(observed, /^\/\/ observed.ts\n/);
     assert.equal(ignored, 'sem cabecalho\n');
+    assert.equal(config, '{"name":"teste"}\n');
     assert.equal(edits > 0, true);
   } finally {
     cleanup();
