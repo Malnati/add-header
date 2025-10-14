@@ -3,7 +3,8 @@
   "name": "add-header-ci",
   "private": true,
   "scripts": {
-    "headers:pr": "ts-node tools/openrouter/add-headers-pr.ts"
+    "headers:pr": "ts-node tools/openrouter/add-headers-pr.ts",
+    "test": "node -r ts-node/register --test tools/openrouter/add-headers-pr.test.ts"
   },
   "dependencies": {
     "ignore": "^5.3.1",
