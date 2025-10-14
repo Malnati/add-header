@@ -9,14 +9,6 @@ const ROOT = execSync('git rev-parse --show-toplevel').toString().trim();
 const BASE = process.env.PR_BASE_SHA ?? 'origin/HEAD~1';
 const HEAD = process.env.PR_HEAD_SHA ?? 'HEAD';
 
-export function shouldProcessPath(p: string): boolean {
-  if (p.startsWith('node_modules/') || p.includes('/node_modules/')) return false;
-  if (p.startsWith('.git/')) return false;
-  if (p.endsWith('.png') || p.endsWith('.jpg') || p.endsWith('.jpeg') || p.endsWith('.svg') || p.endsWith('.ico') || p.endsWith('.gif') || p.endsWith('.pdf')) return false;
-  if (p.endsWith('.map') || p.endsWith('.lock')) return false;
-  return true;
-}
-
 export function listChangedFiles({
   base = BASE,
   head = HEAD,
@@ -26,7 +18,7 @@ export function listChangedFiles({
     .toString()
     .split('\n')
     .filter(Boolean);
-  return out.filter(shouldProcessPath);
+  return out;
 }
 
 export function loadIgnore(root: string = ROOT): (path: string) => boolean {
@@ -35,11 +27,11 @@ export function loadIgnore(root: string = ROOT): (path: string) => boolean {
     const addHeaderPath = join(root, file);
     if (!existsSync(addHeaderPath)) continue;
     const patterns = readFileSync(addHeaderPath, 'utf8');
-    const ig = ignore().add(patterns.split('\n'));
-    return (p: string) => ig.ignores(p);
+    const ig = ignore().add(patterns);
+    return (p: string) => ig.ignores(p.replace(/\\/g, '/'));
   }
   const ig = ignore();
-  return (p: string) => ig.ignores(p);
+  return (p: string) => ig.ignores(p.replace(/\\/g, '/'));
 }
 
 function expectedHeader(rel: string, content: string): { header: string; insertAt: number } {
