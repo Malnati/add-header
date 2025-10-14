@@ -2,7 +2,6 @@
   "// caminho": "package.json",
   "name": "add-header-ci",
   "private": true,
-  "type": "module",
   "scripts": {
     "headers:pr": "ts-node tools/openrouter/add-headers-pr.ts"
   },
