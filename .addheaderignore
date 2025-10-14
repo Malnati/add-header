@@ -1,5 +1,4 @@
 # Ignorar dependências gerenciadas
-node_modules/
 **/node_modules/
 
 # Repositório Git
