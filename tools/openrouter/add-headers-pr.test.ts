@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, copyFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
@@ -79,6 +79,7 @@ test('adds headers to non-ignored files and skips ignored ones (e2e)', async () 
     execSync('git init', { cwd: repo });
     execSync('git config user.email "ci@example.com"', { cwd: repo });
     execSync('git config user.name "CI"', { cwd: repo });
+    copyFileSync(join(process.cwd(), 'addheader.json'), join(repo, 'addheader.json'));
 
     writeFileSync(join(repo, '.addheaderignore'), ['ignored.txt', '*.json'].join('\n'));
     execSync('git add .', { cwd: repo });
