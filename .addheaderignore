@@ -1,0 +1,14 @@
+# .addheaderignore
+# Exemplo de exceções; ajuste conforme necessário
+node_modules/
+dist/
+coverage/
+**/*.json
+**/*.lock
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.svg
+**/*.ico
+**/*.pdf
+**/*.map
