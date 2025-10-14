@@ -1,14 +1,17 @@
-# .addheaderignore
-# Exemplo de exceções; ajuste conforme necessário
+# Ignorar dependências gerenciadas
 node_modules/
-dist/
-coverage/
-**/*.json
-**/*.lock
-**/*.png
-**/*.jpg
-**/*.jpeg
-**/*.svg
-**/*.ico
-**/*.pdf
-**/*.map
+**/node_modules/
+
+# Repositório Git
+.git/
+
+# Arquivos binários e derivados comuns
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.ico
+*.gif
+*.pdf
+*.map
+*.lock

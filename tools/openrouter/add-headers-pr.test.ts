@@ -4,18 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
-import { loadIgnore, shouldProcessPath, run } from './add-headers-pr';
-
-describe('shouldProcessPath', () => {
-  test('filters out known binary and dependency paths', () => {
-    assert.equal(shouldProcessPath('src/index.ts'), true);
-    assert.equal(shouldProcessPath('node_modules/pkg/file.ts'), false);
-    assert.equal(shouldProcessPath('.git/config'), false);
-    assert.equal(shouldProcessPath('assets/logo.png'), false);
-    assert.equal(shouldProcessPath('map/file.js.map'), false);
-    assert.equal(shouldProcessPath('lock/file.lock'), false);
-  });
-});
+import { loadIgnore, run } from './add-headers-pr';
 
 describe('loadIgnore', () => {
   test('uses .addheaderignore when available', () => {
@@ -50,6 +39,20 @@ describe('loadIgnore', () => {
       const ignores = loadIgnore(dir);
       assert.equal(ignores('only-this.txt'), true);
       assert.equal(ignores('file.ts'), false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('supports glob patterns for binary assets', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'add-header-binary-'));
+    try {
+      writeFileSync(join(dir, '.addheaderignore'), ['*.png', '**/node_modules/', '.git/'].join('\n'));
+      const ignores = loadIgnore(dir);
+      assert.equal(ignores('assets/logo.png'), true);
+      assert.equal(ignores('nested/node_modules/pkg/index.ts'), true);
+      assert.equal(ignores('.git/config'), true);
+      assert.equal(ignores('src/index.ts'), false);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
