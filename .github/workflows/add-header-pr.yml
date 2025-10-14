@@ -24,31 +24,36 @@ jobs:
             const pr = context.payload.pull_request;
             if (!pr) core.setFailed('Sem PR no contexto.');
             if (pr.state !== 'open') core.setFailed('PR fechado.');
+            if (pr.mergeable === false) core.setFailed('PR não mergeável.');
             if (pr.mergeable_state && pr.mergeable_state !== 'clean') {
               core.setFailed(`PR não limpo para merge (mergeable_state=${pr.mergeable_state}).`);
             }
-            if (pr.mergeable === false) core.setFailed('PR não mergeável.');
+
   run:
     runs-on: ubuntu-latest
     needs: guard
     if: ${{ success() }}
     steps:
-      - name: Checkout (com histórico completo)
+      - name: Checkout (histórico completo)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Config Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20.x'
+
       - name: Instalar dependências
         run: |
           npm ci || npm i
-      - name: Aplicar cabeçalhos apenas nos arquivos do PR
+
+      - name: Aplicar cabeçalhos nos arquivos do PR
         env:
           OPENROUTER_TOKEN: ${{ secrets.KEY_AGENT_RELATIVE_PATH }}
           USE_OPENROUTER: ${{ vars.USE_OPENROUTER || 'false' }}
@@ -56,6 +61,7 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           npx ts-node tools/openrouter/add-headers-pr.ts
+
       - name: Push na branch do PR (se houve mudanças)
         run: |
           if ! git diff --quiet; then
