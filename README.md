@@ -13,7 +13,8 @@ Manter rastreabilidade e conformidade padronizada em todos os projetos, garantin
 
 - Executa automaticamente em **pull requests prontos para merge** contra a branch principal.  
 - Processa **somente os arquivos modificados** no PR.  
-- Usa o modelo `deepseek-coder` via **OpenRouter**, identificado pela chave `KEY_AGENT_RELATIVE_PATH`.  
+- Usa o modelo `meta-llama/llama-3.2-1b-instruct` via **OpenRouter**, identificado pela chave `KEY_AGENT_RELATIVE_PATH`, por ser a opção com menor custo disponível.
+- Envia instruções enxutas no corpo da requisição e limita os tokens de saída para reduzir o custo por execução.
 - Respeita exceções listadas no arquivo `.addheader` (mesmo formato do `.gitignore`).  
 - Insere o cabeçalho sem alterar o conteúdo restante do arquivo.  
 - Faz *commit* e *push* direto na branch do PR quando necessário.
