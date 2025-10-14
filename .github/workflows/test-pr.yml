@@ -1,0 +1,55 @@
+# .github/workflows/test-pr.yml
+name: test-pr
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detectar alterações
+    runs-on: ubuntu-latest
+    outputs:
+      any_changed: ${{ steps.filter.outputs.any_changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verificar arquivos novos ou modificados
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            any:
+              - added: '**'
+              - modified: '**'
+
+  test:
+    name: Executar testes
+    needs: changes
+    if: ${{ needs.changes.outputs.any_changed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Instalar dependências
+        run: |
+          npm ci || npm i
+
+      - name: Executar testes
+        run: npm test
