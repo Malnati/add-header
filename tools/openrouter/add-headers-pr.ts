@@ -92,18 +92,6 @@ function hasHeader(rel: string, content: string): boolean {
 async function viaOpenRouter(rel: string, content: string, target: string): Promise<string> {
   const token = process.env.OPENROUTER_TOKEN;
   if (!token || process.env.USE_OPENROUTER !== 'true') return target;
-  const prompt = [
-    'Aja como formatador idempotente.',
-    'Se já houver cabeçalho correto de caminho relativo na primeira linha (após shebang quando existir), retorne o conteúdo inalterado.',
-    'Se não houver, insira exatamente um cabeçalho com o caminho relativo informado, obedecendo a sintaxe da linguagem.',
-    'Nunca adicione comentários extras, não altere nada além do cabeçalho.',
-    `Caminho: ${rel.split(sep).join('/')}`,
-    'Conteúdo atual:',
-    '```',
-    content,
-    '```'
-  ].join('\n');
-
   const res = await request('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -113,9 +101,19 @@ async function viaOpenRouter(rel: string, content: string, target: string): Prom
       'X-Title': 'add-header-pr'
     },
     body: JSON.stringify({
-      model: 'deepseek/deepseek-coder',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0
+      model: 'meta-llama/llama-3.2-1b-instruct',
+      messages: [
+        {
+          role: 'system',
+          content: 'Return the full file exactly as output. Ensure the first line is the relative path comment using the language syntax, unless a shebang must stay first.'
+        },
+        {
+          role: 'user',
+          content: `path=${rel.split(sep).join('/')}\n${content}`
+        }
+      ],
+      temperature: 0,
+      max_tokens: content.length + 32
     })
   });
 
