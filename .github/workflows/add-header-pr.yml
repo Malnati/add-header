@@ -54,7 +54,7 @@ jobs:
               return;
             }
 
-            const allowedStates = new Set(['clean', 'has_hooks']);
+            const allowedStates = new Set(['clean', 'has_hooks', 'blocked']);
             if (!current.mergeable_state) {
               core.setFailed('Não foi possível determinar mergeable_state do PR.');
               return;
