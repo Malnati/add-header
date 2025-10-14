@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   changes:
+    if: ${{ github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository }}
     name: Detectar alterações
     runs-on: ubuntu-latest
     outputs:
@@ -34,7 +35,7 @@ jobs:
   test:
     name: Executar testes
     needs: changes
-    if: ${{ needs.changes.outputs.any_changed == 'true' }}
+    if: ${{ needs.changes.result == 'success' && needs.changes.outputs.any_changed == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
