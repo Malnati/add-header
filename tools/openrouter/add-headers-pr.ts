@@ -1,4 +1,4 @@
-// tools/openrouter/add-headers-pr.ts
+
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, sep } from 'node:path';
