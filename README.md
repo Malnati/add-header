@@ -2,7 +2,7 @@
 
 # Add Header CI
 
-Automação para garantir que todos os arquivos de um repositório contenham o **caminho relativo** no topo.
+Automação para garantir que todos os arquivos de um repositório contenham o **caminho relativo** no topo, conforme o padrão definido em `AGENTS.md`.
 
 ## 🎯 Objetivo
 
@@ -53,5 +53,17 @@ coverage/
 
 🧾 Licença
 
-MIT — uso livre e adaptável para qualquer repositório.
+MIT — uso livre e adaptável para qualquer repositório sob a governança RUP da MBRA.
 
+## Validação
+- Rodar `npm ci` e `npm run headers:pr` localmente definindo `PR_BASE_SHA` e `PR_HEAD_SHA` para simular um diff.  
+- Confirmar que arquivos ignorados por `.addheader` não são alterados.  
+- Confirmar que o workflow faz *push* de ajustes apenas quando necessário.
+
+## Entrega
+- Efetuar commit de todos os arquivos acima.  
+- Não modificar outros arquivos.
+
+---
+
+Instruções finais: após aplicar, configurar `KEY_AGENT_RELATIVE_PATH` em *Actions → Secrets* e opcionalmente `USE_OPENROUTER=true` em *Actions → Variables*.

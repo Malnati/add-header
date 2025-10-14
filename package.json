@@ -1,4 +1,5 @@
 {
+  "// caminho": "package.json",
   "name": "add-header-ci",
   "private": true,
   "type": "module",
