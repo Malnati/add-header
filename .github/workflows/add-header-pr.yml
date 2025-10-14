@@ -22,11 +22,46 @@ jobs:
         with:
           script: |
             const pr = context.payload.pull_request;
-            if (!pr) core.setFailed('Sem PR no contexto.');
-            if (pr.state !== 'open') core.setFailed('PR fechado.');
-            if (pr.mergeable === false) core.setFailed('PR não mergeável.');
-            if (pr.mergeable_state && pr.mergeable_state !== 'clean') {
-              core.setFailed(`PR não limpo para merge (mergeable_state=${pr.mergeable_state}).`);
+            if (!pr) {
+              core.setFailed('Sem PR no contexto.');
+              return;
+            }
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = pr.number;
+
+            const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            const maxAttempts = 6;
+            let attempt = 0;
+            let current = pr;
+
+            while (attempt < maxAttempts && (!current.mergeable_state || current.mergeable_state === 'unknown')) {
+              attempt++;
+              core.info(`mergeable_state=${current.mergeable_state ?? 'null'} — aguardando cálculo (${attempt}/${maxAttempts}).`);
+              await sleep(5000);
+              const refreshed = await github.rest.pulls.get({ owner, repo, pull_number });
+              current = refreshed.data;
+            }
+
+            if (current.state !== 'open') {
+              core.setFailed('PR fechado.');
+              return;
+            }
+
+            if (current.mergeable === false) {
+              core.setFailed('PR não mergeável.');
+              return;
+            }
+
+            const allowedStates = new Set(['clean', 'has_hooks']);
+            if (!current.mergeable_state) {
+              core.setFailed('Não foi possível determinar mergeable_state do PR.');
+              return;
+            }
+
+            if (!allowedStates.has(current.mergeable_state)) {
+              core.setFailed(`PR não limpo para merge (mergeable_state=${current.mergeable_state}).`);
             }
 
   run:
