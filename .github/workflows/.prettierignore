@@ -1,0 +1,79 @@
+# Prettier Ignore Configuration
+# Exclude configuration files that should not be formatted by Prettier
+
+# Package manager files
+package.json
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# TypeScript configuration
+tsconfig*.json
+
+# Build and bundler configuration
+vite.config.*
+webpack.config.*
+rollup.config.*
+esbuild.config.*
+
+# Prettier configuration
+prettier.*
+.prettierrc*
+
+# ESLint and linting configuration
+eslint.config.*
+.eslintrc*
+
+# Test configuration
+jest.config.*
+vitest.config.*
+
+# Runtime configuration files (RC files)
+*.rc
+.babelrc*
+.postcssrc*
+
+# Environment files
+.env*
+
+# Directories
+node_modules/
+dist/
+build/
+coverage/
+.next/
+.nuxt/
+.ref/
+
+# Lock files and caches
+*.tsbuildinfo
+.eslintcache
+
+# Editor and IDE files
+.vscode/
+.idea/
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# Documentation files that should maintain their formatting
+README.md
+CHANGELOG.md
+CHANGELOG/
+LICENSE*
+AGENTS.md
+docs/
+
+# Docker files with specific formatting
+Dockerfile*
+docker-compose*.yml
+docker-compose*.yaml
+
+# CI/CD files
+.github/
+
+# GitHub Workflows - arquivos de documentação e logs
+.github/workflows/*.md
+.github/workflows/*.log

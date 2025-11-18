@@ -1,0 +1,479 @@
+# .github/workflows/audit.yml
+
+name: 🔍 Audit & Governance
+
+on:
+  schedule:
+    # Monthly audit on 1st day at 06:00 UTC
+    - cron: "0 6 1 * *"
+  workflow_dispatch:
+    inputs:
+      audit_scope:
+        description: "Audit scope"
+        required: false
+        default: "full"
+        type: choice
+        options:
+          - full
+          - security
+          - governance
+          - changelog
+
+env:
+  NODE_VERSION: "18"
+
+jobs:
+  changelog-compliance:
+    name: 📝 Changelog Compliance Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for comprehensive audit
+
+      - name: 📋 Audit changelog compliance
+        run: |
+          AUDIT_TIMESTAMP=$(date -u '+%Y%m%d%H%M%S')
+
+          # Create audit report
+          cat > changelog-compliance-${AUDIT_TIMESTAMP}.json << 'EOF'
+          {
+            "audit_timestamp": "$(date -u '+%Y-%m-%d %H:%M:%S UTC')",
+            "audit_scope": "changelog_compliance",
+            "total_changelogs": 0,
+            "valid_changelogs": 0,
+            "missing_references": [],
+            "invalid_timestamps": [],
+            "compliance_rate": 0,
+            "recommendations": []
+          }
+          EOF
+
+          # Count total changelogs
+          TOTAL_CHANGELOGS=$(find CHANGELOG/ -name "*.md" | wc -l)
+
+          # Validate timestamp format (YYYYMMDDHHMMSS.md)
+          echo "🔍 Validating changelog timestamps..."
+          INVALID_TIMESTAMPS=()
+          for changelog in CHANGELOG/*.md; do
+            if [[ ! $(basename "$changelog") =~ ^[0-9]{14}\.md$ ]]; then
+              INVALID_TIMESTAMPS+=("$(basename "$changelog")")
+            fi
+          done
+
+          # Check for required issue references (#257-#261)
+          echo "🔍 Checking issue references..."
+          MISSING_REFERENCES=()
+          for changelog in CHANGELOG/*.md; do
+            if ! grep -q "milleniumbrasil/yagnostic#25[7-9]\|milleniumbrasil/yagnostic#26[01]" "$changelog"; then
+              MISSING_REFERENCES+=("$(basename "$changelog")")
+            fi
+          done
+
+          # Calculate compliance rate
+          VALID_CHANGELOGS=$((TOTAL_CHANGELOGS - ${#INVALID_TIMESTAMPS[@]} - ${#MISSING_REFERENCES[@]}))
+          if [ $TOTAL_CHANGELOGS -gt 0 ]; then
+            COMPLIANCE_RATE=$(( (VALID_CHANGELOGS * 100) / TOTAL_CHANGELOGS ))
+          else
+            COMPLIANCE_RATE=0
+          fi
+
+          # Generate detailed report
+          cat > changelog-compliance-${AUDIT_TIMESTAMP}.json << EOF
+          {
+            "audit_timestamp": "$(date -u '+%Y-%m-%d %H:%M:%S UTC')",
+            "audit_scope": "changelog_compliance", 
+            "total_changelogs": ${TOTAL_CHANGELOGS},
+            "valid_changelogs": ${VALID_CHANGELOGS},
+            "invalid_timestamps": $(printf '%s\n' "${INVALID_TIMESTAMPS[@]}" | jq -R . | jq -s .),
+            "missing_references": $(printf '%s\n' "${MISSING_REFERENCES[@]}" | jq -R . | jq -s .),
+            "compliance_rate": ${COMPLIANCE_RATE},
+            "recommendations": [
+              "Ensure all changelogs follow YYYYMMDDHHMMSS.md format",
+              "All changelogs must reference issues #257-#261",
+              "Use pre-commit hooks to validate changelog format"
+            ]
+          }
+          EOF
+
+          echo "📊 Changelog Compliance: ${COMPLIANCE_RATE}%"
+
+          # Set compliance status
+          if [ $COMPLIANCE_RATE -lt 95 ]; then
+            echo "❌ Changelog compliance below 95% threshold"
+            exit 1
+          else
+            echo "✅ Changelog compliance meets requirements"
+          fi
+
+      - name: 📊 Upload changelog audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog-compliance-audit
+          path: changelog-compliance-*.json
+          retention-days: 90
+
+  variable-audit:
+    name: 🔧 Variable Mapping Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 Audit variable consistency
+        run: |
+          AUDIT_TIMESTAMP=$(date -u '+%Y%m%d%H%M%S')
+
+          echo "🔍 Auditing variable mapping consistency..."
+
+          # Check variables in .env.example
+          ENV_VARS=$(grep -E '^[A-Z_]+=' .env.example | cut -d'=' -f1 | sort)
+
+          # Check variables in docker-compose.yml  
+          COMPOSE_VARS=$(grep -E '\$\{[A-Z_]+' docker-compose.yml | grep -o '\$\{[A-Z_][^}]*' | sed 's/\$\{//' | cut -d':' -f1 | sort -u)
+
+          # Find variables in .env but not in compose
+          UNUSED_ENV_VARS=()
+          while read -r var; do
+            if ! echo "$COMPOSE_VARS" | grep -q "^${var}$"; then
+              UNUSED_ENV_VARS+=("$var")
+            fi
+          done <<< "$ENV_VARS"
+
+          # Find variables in compose but not in .env
+          MISSING_ENV_VARS=()
+          while read -r var; do
+            if ! echo "$ENV_VARS" | grep -q "^${var}$"; then
+              MISSING_ENV_VARS+=("$var")
+            fi
+          done <<< "$COMPOSE_VARS"
+
+          # Generate variable audit report
+          cat > variable-audit-${AUDIT_TIMESTAMP}.json << EOF
+          {
+            "audit_timestamp": "$(date -u '+%Y-%m-%d %H:%M:%S UTC')",
+            "audit_scope": "variable_mapping",
+            "total_env_vars": $(echo "$ENV_VARS" | wc -l),
+            "total_compose_vars": $(echo "$COMPOSE_VARS" | wc -l),
+            "unused_env_vars": $(printf '%s\n' "${UNUSED_ENV_VARS[@]}" | jq -R . | jq -s .),
+            "missing_env_vars": $(printf '%s\n' "${MISSING_ENV_VARS[@]}" | jq -R . | jq -s .),
+            "critical_variables": [
+              "MESSAGE_PREFIX",
+              "NOTIFICATION_DEFAULT_COMPANY_NAME", 
+              "API_CONSENT_VERSION",
+              "DASHBOARD_URL",
+              "ADMIN_URL"
+            ],
+            "recommendations": [
+              "Remove unused variables from .env.example",
+              "Add missing variables to .env.example with defaults",
+              "Update variable mapping documentation"
+            ]
+          }
+          EOF
+
+          # Check critical variables
+          CRITICAL_VARS=("MESSAGE_PREFIX" "NOTIFICATION_DEFAULT_COMPANY_NAME" "API_CONSENT_VERSION" "DASHBOARD_URL" "ADMIN_URL")
+          MISSING_CRITICAL=()
+
+          for var in "${CRITICAL_VARS[@]}"; do
+            if ! grep -q "^${var}=" .env.example; then
+              MISSING_CRITICAL+=("$var")
+            fi
+          done
+
+          if [ ${#MISSING_CRITICAL[@]} -gt 0 ]; then
+            echo "❌ Critical variables missing: ${MISSING_CRITICAL[*]}"
+            exit 1
+          fi
+
+          echo "✅ Variable mapping audit completed"
+
+      - name: 📊 Upload variable audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: variable-audit-results
+          path: variable-audit-*.json
+          retention-days: 90
+
+  security-audit:
+    name: 🛡️ Security Compliance Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 Security vulnerability scan
+        run: |
+          AUDIT_TIMESTAMP=$(date -u '+%Y%m%d%H%M%S')
+
+          # Scan for hardcoded secrets
+          echo "🔍 Scanning for hardcoded secrets..."
+          SECRET_VIOLATIONS=()
+
+          # Check for potential API keys, tokens, passwords
+          if grep -r -E '(api[_-]?key|token|password|secret).*(=|:).*(sk_|pk_|[A-Za-z0-9]{32,})' --exclude-dir=.git --exclude-dir=node_modules --exclude='*.md' .; then
+            SECRET_VIOLATIONS+=("Potential hardcoded secrets found")
+          fi
+
+          # Check LGPD compliance indicators
+          echo "🔍 Checking LGPD compliance..."
+          LGPD_COMPLIANCE=true
+
+          if ! grep -q "API_CONSENT_VERSION" .env.example; then
+            LGPD_COMPLIANCE=false
+          fi
+
+          if ! grep -q "API_CONSENT_VALIDITY_PERIOD_MS" .env.example; then
+            LGPD_COMPLIANCE=false  
+          fi
+
+          # Generate security audit report
+          cat > security-audit-${AUDIT_TIMESTAMP}.json << EOF
+          {
+            "audit_timestamp": "$(date -u '+%Y-%m-%d %H:%M:%S UTC')",
+            "audit_scope": "security_compliance",
+            "secret_violations": $(printf '%s\n' "${SECRET_VIOLATIONS[@]}" | jq -R . | jq -s .),
+            "lgpd_compliant": ${LGPD_COMPLIANCE},
+            "security_score": $([ ${#SECRET_VIOLATIONS[@]} -eq 0 ] && [ "$LGPD_COMPLIANCE" = true ] && echo "100" || echo "0"),
+            "recommendations": [
+              "Use environment variables for all sensitive data",
+              "Implement secret scanning in pre-commit hooks", 
+              "Regular LGPD compliance reviews",
+              "Automated security testing in CI/CD"
+            ]
+          }
+          EOF
+
+          if [ ${#SECRET_VIOLATIONS[@]} -gt 0 ] || [ "$LGPD_COMPLIANCE" != "true" ]; then
+            echo "❌ Security compliance issues found"
+            exit 1
+          fi
+
+          echo "✅ Security audit passed"
+
+      - name: 📊 Upload security audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit-results
+          path: security-audit-*.json
+          retention-days: 90
+
+  governance-audit:
+    name: 📋 Governance Compliance Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 RUP compliance audit
+        run: |
+          AUDIT_TIMESTAMP=$(date -u '+%Y%m%d%H%M%S')
+
+          echo "🔍 Auditing RUP compliance..."
+
+          # Check required documentation
+          REQUIRED_DOCS=(
+            "AGENTS.md"
+            "PIPELINE.md" 
+            "docs/templates/qa-checklist-template.md"
+            "docs/technical/variable-mapping.md"
+            "docs/processes/audit-process.md"
+            "docs/policies/changelog-policy.md"
+          )
+
+          MISSING_DOCS=()
+          for doc in "${REQUIRED_DOCS[@]}"; do
+            if [ ! -f "$doc" ]; then
+              MISSING_DOCS+=("$doc")
+            fi
+          done
+
+          # Check pipeline workflows
+          REQUIRED_WORKFLOWS=(
+            ".github/workflows/build.yml"
+            ".github/workflows/test.yml" 
+            ".github/workflows/audit.yml"
+          )
+
+          MISSING_WORKFLOWS=()
+          for workflow in "${REQUIRED_WORKFLOWS[@]}"; do
+            if [ ! -f "$workflow" ]; then
+              MISSING_WORKFLOWS+=("$workflow")
+            fi
+          done
+
+          # Calculate governance score
+          TOTAL_ITEMS=$((${#REQUIRED_DOCS[@]} + ${#REQUIRED_WORKFLOWS[@]}))
+          MISSING_ITEMS=$((${#MISSING_DOCS[@]} + ${#MISSING_WORKFLOWS[@]}))
+          GOVERNANCE_SCORE=$(( ((TOTAL_ITEMS - MISSING_ITEMS) * 100) / TOTAL_ITEMS ))
+
+          # Generate governance audit report
+          cat > governance-audit-${AUDIT_TIMESTAMP}.json << EOF
+          {
+            "audit_timestamp": "$(date -u '+%Y-%m-%d %H:%M:%S UTC')",
+            "audit_scope": "governance_compliance",
+            "missing_documentation": $(printf '%s\n' "${MISSING_DOCS[@]}" | jq -R . | jq -s .),
+            "missing_workflows": $(printf '%s\n' "${MISSING_WORKFLOWS[@]}" | jq -R . | jq -s .),
+            "governance_score": ${GOVERNANCE_SCORE},
+            "rup_compliance": $([ $GOVERNANCE_SCORE -ge 95 ] && echo "true" || echo "false"),
+            "recommendations": [
+              "Ensure all required documentation is present",
+              "Maintain pipeline workflows as per PIPELINE.md",
+              "Regular governance reviews",
+              "Update documentation with code changes"
+            ]
+          }
+          EOF
+
+          echo "📊 Governance Score: ${GOVERNANCE_SCORE}%"
+
+          if [ $GOVERNANCE_SCORE -lt 95 ]; then
+            echo "❌ Governance compliance below 95% threshold"
+            exit 1
+          fi
+
+          echo "✅ Governance audit passed"
+
+      - name: 📊 Upload governance audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: governance-audit-results
+          path: governance-audit-*.json
+          retention-days: 90
+
+  consolidated-audit-report:
+    name: 📊 Consolidated Audit Report
+    runs-on: ubuntu-latest
+    needs:
+      [changelog-compliance, variable-audit, security-audit, governance-audit]
+    if: always()
+
+    steps:
+      - name: 📥 Download all audit artifacts
+        uses: actions/download-artifact@v4.1.3
+
+      - name: 📋 Generate consolidated report
+        run: |
+          REPORT_TIMESTAMP=$(date -u '+%Y%m%d%H%M%S')
+
+          # Create comprehensive audit report
+          cat > audit-report-${REPORT_TIMESTAMP}.md << 'EOF'
+          # 🔍 Comprehensive Audit Report
+
+          **Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')  
+          **Audit Scope:** ${{ github.event.inputs.audit_scope || 'full' }}  
+          **Repository:** ${{ github.repository }}  
+          **Commit:** ${{ github.sha }}
+
+          ## 📊 Audit Summary
+
+          | Audit Type | Status | Score/Compliance |
+          |------------|--------|------------------|  
+          | **Changelog Compliance** | ${{ needs.changelog-compliance.result }} | From JSON report |
+          | **Variable Mapping** | ${{ needs.variable-audit.result }} | From JSON report |
+          | **Security & LGPD** | ${{ needs.security-audit.result }} | From JSON report |
+          | **Governance (RUP)** | ${{ needs.governance-audit.result }} | From JSON report |
+
+          ## 📋 Key Findings
+
+          ### ✅ Strengths
+          - Comprehensive QA checklist template implemented
+          - Variable mapping documentation created  
+          - Audit process formally documented
+          - Pipeline workflows aligned with PIPELINE.md
+
+          ### ⚠️ Areas for Improvement
+          - [Generated from individual audit results]
+          - [Specific recommendations from each audit]
+
+          ### 🚨 Critical Issues
+          - [Only if any audit failed]
+
+          ## 📁 Detailed Reports
+
+          Individual audit reports are available as artifacts:
+          - `changelog-compliance-audit/` - Changelog format and references
+          - `variable-audit-results/` - Environment variable consistency  
+          - `security-audit-results/` - Security and LGPD compliance
+          - `governance-audit-results/` - RUP documentation compliance
+
+          ## 🔄 Follow-up Actions
+
+          - [ ] Address any critical issues immediately
+          - [ ] Plan remediation for improvement areas  
+          - [ ] Schedule next audit (monthly recurring)
+          - [ ] Update processes based on findings
+
+          ## 🔗 References
+
+          - **Issues:** milleniumbrasil/yagnostic#257-#261
+          - **Governance:** `docs/processes/audit-process.md`
+          - **Standards:** `AGENTS.md`, `PIPELINE.md`
+
+          ---
+
+          **Next Audit:** $(date -d '+1 month' -u '+%Y-%m-%d')  
+          **Responsible:** DevOps Team / MBRA
+          EOF
+
+      - name: 📊 Upload consolidated audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: consolidated-audit-report
+          path: audit-report-*.md
+          retention-days: 365 # Keep audit reports for 1 year
+
+      - name: 📋 Create GitHub Issue for findings
+        if: ${{ needs.changelog-compliance.result != 'success' || needs.variable-audit.result != 'success' || needs.security-audit.result != 'success' || needs.governance-audit.result != 'success' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `🔍 Audit Findings - ${new Date().toISOString().split('T')[0]}`;
+            const body = `
+            # Audit Findings Report
+
+            **Date:** ${new Date().toISOString()}
+            **Workflow:** ${{ github.run_id }}
+
+            ## Failed Audits
+            ${context.payload.needs.changelog-compliance?.result !== 'success' ? '- ❌ Changelog Compliance' : ''}
+            ${context.payload.needs.variable-audit?.result !== 'success' ? '- ❌ Variable Mapping' : ''}
+            ${context.payload.needs.security-audit?.result !== 'success' ? '- ❌ Security & LGPD' : ''}
+            ${context.payload.needs.governance-audit?.result !== 'success' ? '- ❌ Governance (RUP)' : ''}
+
+            ## Action Required
+
+            Please review the detailed audit reports in the workflow artifacts and address any compliance issues.
+
+            **Related Issues:** #257, #258, #259, #260, #261
+            **Priority:** High
+            `;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['audit', 'governance', 'high-priority']
+            });
+
+      - name: ✅ Audit success summary
+        if: ${{ needs.changelog-compliance.result == 'success' && needs.variable-audit.result == 'success' && needs.security-audit.result == 'success' && needs.governance-audit.result == 'success' }}
+        run: |
+          echo "🎉 All audits completed successfully!"
+          echo "✅ Repository maintains high compliance standards"
+          echo "📊 Audit reports retained for governance tracking"
+
+      - name: ❌ Audit failure summary
+        if: ${{ needs.changelog-compliance.result != 'success' || needs.variable-audit.result != 'success' || needs.security-audit.result != 'success' || needs.governance-audit.result != 'success' }}
+        run: |
+          echo "⚠️ One or more audits failed!"
+          echo "🔍 Check individual audit results for details"  
+          echo "📋 GitHub issue created for tracking remediation"
+          exit 1

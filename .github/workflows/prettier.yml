@@ -1,0 +1,57 @@
+# .github/workflows/prettier.yml
+name: Prettier Formatting
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  run-prettier:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Find Node.js project directories
+        id: find-projects
+        run: |
+          # Encontra todos os diretórios que contêm package.json na raiz
+          # Exclui node_modules, .git, e diretórios de referência/documentação
+          PROJECT_DIRS=$(find . -name "package.json" -type f -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/docs/*" -not -path "*/.ref/*" -exec dirname {} \; | sort -u | sed 's|^\./||' | sed 's|$|/|' | tr '\n' ' ' | sed 's/[[:space:]]*$//')
+          
+          # Se não houver projetos, define um valor padrão vazio
+          if [ -z "$PROJECT_DIRS" ]; then
+            echo "⚠️ No Node.js projects found. Prettier will skip formatting."
+            echo "dirs=" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Found Node.js projects: $PROJECT_DIRS"
+            echo "dirs=$PROJECT_DIRS" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Prettier action
+        uses: creyD/prettier_action@v4.6
+        with:
+          dry: false
+          no_commit: false
+          prettier_version: latest
+          working_directory: .
+          prettier_options: "--ignore-path .prettierignore --ignore-unknown --write ${{ steps.find-projects.outputs.dirs }}"
+          commit_message: "chore: format code with Prettier"
+          commit_description: "Automated code formatting using Prettier action."
+          same_commit: false
+          clean_node_folder: true
+          git_identity: actions
+          allow_other_plugins: false
+          only_changed: false
+          only_changed_pr: false
+          commit_options: ""
+          push_options: ""
+          file_pattern: "*"
+          prettier_plugins: ""
+          github_token: ${{ secrets.COPILOT_PAT }}

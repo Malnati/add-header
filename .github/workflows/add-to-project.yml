@@ -1,0 +1,27 @@
+# .github/workflow/add-to-project.yml
+name: Add issues and pull requests to project
+
+on:
+  issues:
+    types:
+      - opened
+      - reopened
+      - transferred
+  pull_request:
+    types:
+      - opened
+
+jobs:
+  add-to-project:
+    name: Add item to project
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - name: Add current item to project
+        uses: actions/add-to-project@v1.0.2
+        with:
+          project-url: https://github.com/orgs/milleniumbrasil/projects/18
+          github-token: ${{ secrets.COPILOT_PAT }}

@@ -1,0 +1,42 @@
+# .github/workflow/conventional-commits.yml
+name: Conventional Commits Validation
+
+on:
+  pull_request:
+    branches:
+      - staging
+  push:
+    branches:
+      - staging
+
+jobs:
+  check-commit-messages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate conventional commits
+        uses: gentleseal/action-conventional-commits@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          valid-commit-types: >
+            [
+              "feat",
+              "fix",
+              "docs",
+              "style",
+              "refactor",
+              "test",
+              "build",
+              "ci",
+              "chore",
+              "revert",
+              "merge",
+              "wip",
+              "enh"
+            ]

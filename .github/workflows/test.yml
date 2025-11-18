@@ -1,0 +1,415 @@
+# .github/workflows/test.yml
+
+name: 🧪 Test Suite (Disabled)
+
+# Workflow is intentionally disabled - no triggers configured
+# Remove this comment and configure 'on:' section to enable
+
+on:
+  push:
+    branches: [staging]
+  pull_request:
+    branches: [staging]
+
+env:
+  NODE_VERSION: "18"
+  PLAYWRIGHT_VERSION: "1.40.0"
+
+jobs:
+  disabled-notice:
+    name: ⚠️ Workflow Disabled
+    runs-on: ubuntu-latest
+    if: false # This job will never run
+    steps:
+      - name: Notice
+        run: echo "This workflow is intentionally disabled until further notice"
+#   unit-tests-api:
+#     name: 🔬 API Unit Tests
+#     runs-on: ubuntu-latest
+
+#     steps:
+#     - name: 📥 Checkout repository
+#       uses: actions/checkout@v4
+
+#     - name: 📋 Setup Node.js
+#       uses: actions/setup-node@v4
+#       with:
+#         node-version: ${{ env.NODE_VERSION }}
+#         cache: 'npm'
+#         cache-dependency-path: api/package-lock.json
+
+#     - name: 📦 Install dependencies
+#       working-directory: api
+#       run: npm ci
+
+#     - name: 🧪 Run unit tests
+#       working-directory: api
+#       run: |
+#         npm run test -- --coverage --watchAll=false 2>&1 | tee test-results.log
+
+#     - name: 📊 Upload test results
+#       uses: actions/upload-artifact@v4
+#       with:
+#         name: api-unit-test-results
+#         path: |
+#           api/coverage/
+#           api/test-results.log
+#         retention-days: 7
+
+#   unit-tests-ui:
+#     name: 🎨 UI Unit Tests
+#     runs-on: ubuntu-latest
+
+#     steps:
+#     - name: 📥 Checkout repository
+#       uses: actions/checkout@v4
+
+#     - name: 📋 Setup Node.js
+#       uses: actions/setup-node@v4
+#       with:
+#         node-version: ${{ env.NODE_VERSION }}
+#         cache: 'npm'
+#         cache-dependency-path: ui/package-lock.json
+
+#     - name: 📦 Install dependencies
+#       working-directory: ui
+#       run: npm ci
+
+#     - name: 🧪 Run unit tests
+#       working-directory: ui
+#       run: |
+#         npm run test -- --coverage --watchAll=false 2>&1 | tee test-results.log
+
+#     - name: 📊 Upload test results
+#       uses: actions/upload-artifact@v4
+#       with:
+#         name: ui-unit-test-results
+#         path: |
+#           ui/coverage/
+#           ui/test-results.log
+#         retention-days: 7
+
+#   unit-tests-extension:
+#     name: 🔌 Extension Unit Tests
+#     runs-on: ubuntu-latest
+
+#     steps:
+#     - name: 📥 Checkout repository
+#       uses: actions/checkout@v4
+
+#     - name: 📋 Setup Node.js
+#       uses: actions/setup-node@v4
+#       with:
+#         node-version: ${{ env.NODE_VERSION }}
+#         cache: 'npm'
+#         cache-dependency-path: extension/package-lock.json
+
+#     - name: 📦 Install dependencies
+#       working-directory: extension
+#       run: npm ci
+
+#     - name: 🧪 Run unit tests
+#       working-directory: extension
+#       run: |
+#         npm run test -- --coverage --watchAll=false 2>&1 | tee test-results.log
+
+#     - name: 📊 Upload test results
+#       uses: actions/upload-artifact@v4
+#       with:
+#         name: extension-unit-test-results
+#         path: |
+#           extension/coverage/
+#           extension/test-results.log
+#         retention-days: 7
+
+#   integration-tests:
+#     name: 🔗 Integration Tests
+#     runs-on: ubuntu-latest
+#     needs: [unit-tests-api, unit-tests-ui]
+
+#     services:
+#       api:
+#         image: node:18
+#         options: --health-cmd="curl -f http://localhost:3333/health || exit 1" --health-interval=10s --health-timeout=5s --health-retries=5
+
+#     steps:
+#     - name: 📥 Checkout repository
+#       uses: actions/checkout@v4
+
+#     - name: 📋 Setup Node.js
+#       uses: actions/setup-node@v4
+#       with:
+#         node-version: ${{ env.NODE_VERSION }}
+#         cache: 'npm'
+
+#     - name: 🐳 Start test environment
+#       run: |
+#         # Copy environment variables for testing
+#         cp .env.example .env
+
+#         # Start services with docker compose (v2 syntax)
+#         docker compose -f docker-compose.yml up -d api
+
+#         # Wait for services to be ready
+#         timeout 60 bash -c 'until curl -f http://localhost:3333/health; do sleep 2; done'
+
+#     - name: 📦 Install test dependencies
+#       run: npm ci
+
+#     - name: 🧪 Run integration tests
+#       run: |
+#         npm run test:integration 2>&1 | tee integration-test-results.log
+
+#     - name: 📊 Collect service logs
+#       if: always()
+#       run: |
+#         docker compose logs api > api-service.log
+#         docker compose logs ui > ui-service.log || true
+
+#     - name: 🛑 Stop test environment
+#       if: always()
+#       run: |
+#         docker compose down -v
+
+#     - name: 📊 Upload integration test results
+#       uses: actions/upload-artifact@v4
+#       with:
+#         name: integration-test-results
+#         path: |
+#           integration-test-results.log
+#           api-service.log
+#           ui-service.log
+#         retention-days: 7
+
+#   e2e-tests:
+#     name: 🎭 E2E Tests (Playwright)
+#     runs-on: ubuntu-latest
+#     needs: [integration-tests]
+
+#     strategy:
+#       matrix:
+#         browser: [chromium, firefox, webkit]
+#       fail-fast: false
+
+#     steps:
+#     - name: 📥 Checkout repository
+#       uses: actions/checkout@v4
+
+#     - name: 📋 Setup Node.js
+#       uses: actions/setup-node@v4
+#       with:
+#         node-version: ${{ env.NODE_VERSION }}
+#         cache: 'npm'
+
+#     - name: 📦 Install dependencies
+#       run: npm ci
+
+#     - name: 🎭 Install Playwright browsers
+#       run: |
+#         npm install -g playwright@${{ env.PLAYWRIGHT_VERSION }}
+#         playwright install ${{ matrix.browser }} --with-deps
+
+#     - name: 🐳 Start full test environment
+#       run: |
+#         cp .env.example .env
+#         docker compose -f docker-compose.yml up -d
+
+#         # Wait for all services
+#         timeout 120 bash -c 'until curl -f http://localhost:3333/health && curl -f http://localhost:4173; do sleep 5; done'
+
+#     - name: 🧪 Run E2E tests
+#       run: |
+#         playwright test --project=${{ matrix.browser }} --reporter=html 2>&1 | tee e2e-test-results-${{ matrix.browser }}.log
+
+#     - name: 📊 Upload E2E test results
+#       uses: actions/upload-artifact@v4
+#       if: always()
+#       with:
+#         name: e2e-test-results-${{ matrix.browser }}
+#         path: |
+#           playwright-report/
+#           test-results/
+#           e2e-test-results-${{ matrix.browser }}.log
+#         retention-days: 14
+
+#     - name: 🛑 Stop test environment
+#       if: always()
+#       run: |
+#         docker compose down -v
+
+#   accessibility-tests:
+#     name: ♿ Accessibility Tests
+#     runs-on: ubuntu-latest
+#     needs: [unit-tests-ui, unit-tests-extension]
+
+#     steps:
+#     - name: 📥 Checkout repository
+#       uses: actions/checkout@v4
+
+#     - name: 📋 Setup Node.js
+#       uses: actions/setup-node@v4
+#       with:
+#         node-version: ${{ env.NODE_VERSION }}
+#         cache: 'npm'
+
+#     - name: 🐳 Start UI for testing
+#       run: |
+#         cp .env.example .env
+#         docker compose -f docker-compose.yml up -d api ui
+#         timeout 60 bash -c 'until curl -f http://localhost:4173; do sleep 2; done'
+
+#     - name: ♿ Install axe-core CLI
+#       run: npm install -g @axe-core/cli
+
+#     - name: 🧪 Run accessibility tests
+#       run: |
+#         # Test main pages for WCAG AA compliance
+#         axe http://localhost:4173 --tags wcag2a,wcag2aa --reporter json > axe-results-home.json || true
+#         axe http://localhost:4173/dashboard --tags wcag2a,wcag2aa --reporter json > axe-results-dashboard.json || true
+
+#         # Generate summary report
+#         echo "# Accessibility Test Results" > accessibility-summary.md
+#         echo "" >> accessibility-summary.md
+#         echo "## Pages Tested" >> accessibility-summary.md
+#         echo "- Home page: $(jq '.violations | length' axe-results-home.json) violations" >> accessibility-summary.md
+#         echo "- Dashboard: $(jq '.violations | length' axe-results-dashboard.json) violations" >> accessibility-summary.md
+
+#     - name: 📊 Upload accessibility results
+#       uses: actions/upload-artifact@v4
+#       with:
+#         name: accessibility-test-results
+#         path: |
+#           axe-results-*.json
+#           accessibility-summary.md
+#         retention-days: 30
+
+#     - name: 🛑 Stop test environment
+#       if: always()
+#       run: docker compose down -v
+
+#   performance-tests:
+#     name: 🚀 Performance Tests (Lighthouse)
+#     runs-on: ubuntu-latest
+#     needs: [unit-tests-ui]
+
+#     steps:
+#     - name: 📥 Checkout repository
+#       uses: actions/checkout@v4
+
+#     - name: 📋 Setup Node.js
+#       uses: actions/setup-node@v4
+#       with:
+#         node-version: ${{ env.NODE_VERSION }}
+#         cache: 'npm'
+
+#     - name: 🐳 Start UI for testing
+#       run: |
+#         cp .env.example .env
+#         docker compose -f docker-compose.yml up -d api ui
+#         timeout 60 bash -c 'until curl -f http://localhost:4173; do sleep 2; done'
+
+#     - name: 🚀 Install Lighthouse CI
+#       run: npm install -g @lhci/cli@0.12.x
+
+#     - name: 🧪 Run Lighthouse tests
+#       run: |
+#         lhci autorun --upload.target=filesystem --upload.outputDir=./lighthouse-results || true
+
+#     - name: 📊 Generate performance summary
+#       run: |
+#         echo "# Performance Test Results" > performance-summary.md
+#         echo "" >> performance-summary.md
+#         echo "Lighthouse reports generated for:" >> performance-summary.md
+#         echo "- Performance score threshold: ≥90" >> performance-summary.md
+#         echo "- Accessibility score threshold: ≥95" >> performance-summary.md
+#         echo "- Best practices score threshold: ≥90" >> performance-summary.md
+
+#     - name: 📊 Upload performance results
+#       uses: actions/upload-artifact@v4
+#       with:
+#         name: performance-test-results
+#         path: |
+#           lighthouse-results/
+#           performance-summary.md
+#         retention-days: 14
+
+#     - name: 🛑 Stop test environment
+#       if: always()
+#       run: docker compose down -v
+
+#   test-report:
+#     name: 📋 Test Report Summary
+#     runs-on: ubuntu-latest
+#     needs: [unit-tests-api, unit-tests-ui, unit-tests-extension, integration-tests, e2e-tests, accessibility-tests, performance-tests]
+#     if: always()
+
+#     steps:
+#     - name: 📥 Download all test artifacts
+#       uses: actions/download-artifact@v4
+
+#     - name: 📊 Generate comprehensive test report
+#       run: |
+#         # Create timestamp
+#         TIMESTAMP=$(date -u '+%Y%m%d%H%M%S')
+
+#         # Generate test report
+#         cat > test-report-${TIMESTAMP}.md << 'EOF'
+#         # 🧪 Test Report Summary
+
+#         **Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+#         **Trigger:** ${{ github.event_name }}
+#         **Branch:** ${{ github.ref_name }}
+#         **Commit:** ${{ github.sha }}
+
+#         ## 📊 Test Results Overview
+
+#         ### Unit Tests
+#         - **API:** ${{ needs.unit-tests-api.result }}
+#         - **UI:** ${{ needs.unit-tests-ui.result }}
+#         - **Extension:** ${{ needs.unit-tests-extension.result }}
+
+#         ### Integration & E2E Tests
+#         - **Integration Tests:** ${{ needs.integration-tests.result }}
+#         - **E2E Tests:** ${{ needs.e2e-tests.result }}
+
+#         ### Quality Assurance
+#         - **Accessibility (axe-core):** ${{ needs.accessibility-tests.result }}
+#         - **Performance (Lighthouse):** ${{ needs.performance-tests.result }}
+
+#         ## 📁 Artifacts Available
+
+#         - Unit test coverage reports (7 days)
+#         - E2E test results and screenshots (14 days)
+#         - Accessibility scan results (30 days)
+#         - Performance reports (14 days)
+
+#         ## 🔗 Next Steps
+
+#         - ✅ All tests passed: Ready for review pipeline
+#         - ❌ Tests failed: Check individual job logs for details
+#         - 🔍 Review artifacts for detailed analysis
+
+#         EOF
+
+#         echo "Test report generated: test-report-${TIMESTAMP}.md"
+
+#     - name: ✅ All tests passed
+#       if: ${{ needs.unit-tests-api.result == 'success' && needs.unit-tests-ui.result == 'success' && needs.unit-tests-extension.result == 'success' && needs.integration-tests.result == 'success' && needs.e2e-tests.result == 'success' }}
+#       run: |
+#         echo "🎉 All tests completed successfully!"
+#         echo "✅ Code quality verified across all layers."
+#         echo "🚀 Ready for production deployment."
+
+#     - name: ⚠️ Some tests failed
+#       if: ${{ needs.unit-tests-api.result != 'success' || needs.unit-tests-ui.result != 'success' || needs.unit-tests-extension.result != 'success' || needs.integration-tests.result != 'success' || needs.e2e-tests.result != 'success' }}
+#       run: |
+#         echo "⚠️ Some tests failed or were skipped!"
+#         echo "🔍 Review individual job results for details."
+#         echo "📋 Check test artifacts for failure analysis."
+
+#     - name: 📊 Upload final test report
+#       uses: actions/upload-artifact@v4
+#       with:
+#         name: complete-test-report
+#         path: test-report-*.md
+#         retention-days: 30

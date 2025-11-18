@@ -1,0 +1,273 @@
+# .github/workflows/build.yml
+
+name: 🔨 Build & Validate
+
+on:
+  push:
+    branches: [staging]
+  pull_request:
+    branches: [staging]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "18"
+
+jobs:
+  build-api:
+    name: 📦 Build API
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📋 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: api/package-lock.json
+
+      - name: 📦 Install API dependencies
+        working-directory: api
+        run: npm ci
+
+      - name: 🏗️ Build API
+        working-directory: api
+        run: |
+          npm run build 2>&1 | tee build.log
+          echo "Build completed at $(date)" >> build.log
+
+      - name: 🧹 Lint API
+        working-directory: api
+        run: npm run lint
+
+      - name: 🔍 TypeScript check
+        working-directory: api
+        run: npm run typecheck || npx tsc --noEmit
+
+      - name: 📊 Upload API build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-build-artifacts
+          path: |
+            api/dist/
+            api/build.log
+          retention-days: 7
+
+  build-ui:
+    name: 🎨 Build UI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📋 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: ui/package-lock.json
+
+      - name: 📦 Install UI dependencies
+        working-directory: ui
+        run: npm ci
+
+      - name: 🏗️ Build UI
+        working-directory: ui
+        run: |
+          npm run build 2>&1 | tee build.log
+          echo "Build completed at $(date)" >> build.log
+
+      - name: 🧹 Lint UI
+        working-directory: ui
+        run: npm run lint
+
+      - name: 🔍 TypeScript check
+        working-directory: ui
+        run: npm run typecheck || npx tsc --noEmit
+
+      - name: 📊 Upload UI build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-build-artifacts
+          path: |
+            ui/dist/
+            ui/build.log
+          retention-days: 7
+
+  build-extension:
+    name: 🔌 Build Extension
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📋 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: extension/package-lock.json
+
+      - name: 📦 Install Extension dependencies
+        working-directory: extension
+        run: npm ci
+
+      - name: 🏗️ Build Extension
+        working-directory: extension
+        run: |
+          npm run build 2>&1 | tee build.log
+          echo "Build completed at $(date)" >> build.log
+
+      - name: 🧹 Lint Extension
+        working-directory: extension
+        run: npm run lint
+
+      - name: 🔍 TypeScript check
+        working-directory: extension
+        run: npm run typecheck || npx tsc --noEmit
+
+      - name: 📦 Package Extension
+        working-directory: extension
+        run: |
+          # Create extension package for testing
+          zip -r extension-build.zip dist/ manifest.json
+
+      - name: 📊 Upload Extension build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-build-artifacts
+          path: |
+            extension/dist/
+            extension/build.log
+            extension/extension-build.zip
+          retention-days: 7
+
+  docker-build:
+    name: 🐳 Docker Build Test
+    runs-on: ubuntu-latest
+    needs: [build-api, build-ui]
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐳 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🏗️ Build API Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./api
+          file: ./api/Dockerfile
+          push: false
+          tags: yagnostic-api:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 🏗️ Build UI Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ui
+          file: ./ui/Dockerfile
+          push: false
+          tags: yagnostic-ui:test
+          build-args: |
+            VITE_API_URL=http://localhost:3333
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  security-scan:
+    name: 🛡️ Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔍 Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          format: "sarif"
+          output: "trivy-results.sarif"
+
+      - name: 📊 Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "trivy-results.sarif"
+
+      - name: 🔐 npm audit (API)
+        working-directory: api
+        run: |
+          npm audit --audit-level=moderate --production
+          npm audit --json > npm-audit-api.json || true
+
+      - name: 🔐 npm audit (UI)
+        working-directory: ui
+        run: |
+          npm audit --audit-level=moderate --production
+          npm audit --json > npm-audit-ui.json || true
+
+      - name: 🔐 npm audit (Extension)
+        working-directory: extension
+        run: |
+          npm audit --audit-level=moderate --production  
+          npm audit --json > npm-audit-extension.json || true
+
+      - name: 📊 Upload security scan results
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-results
+          path: |
+            trivy-results.sarif
+            api/npm-audit-api.json
+            ui/npm-audit-ui.json
+            extension/npm-audit-extension.json
+          retention-days: 30
+
+  build-status:
+    name: 📋 Build Status Summary
+    runs-on: ubuntu-latest
+    needs: [build-api, build-ui, build-extension, docker-build, security-scan]
+    if: always()
+
+    steps:
+      - name: 📥 Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: 📋 Generate build summary
+        run: |
+          echo "# 🔨 Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Component Status" >> $GITHUB_STEP_SUMMARY
+          echo "- **API Build:** ${{ needs.build-api.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **UI Build:** ${{ needs.build-ui.result }}" >> $GITHUB_STEP_SUMMARY  
+          echo "- **Extension Build:** ${{ needs.build-extension.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Docker Build:** ${{ needs.docker-build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Security Scan:** ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔗 Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "Build artifacts and logs are available for 7 days." >> $GITHUB_STEP_SUMMARY
+          echo "Security scan results are retained for 30 days." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📋 Policy Compliance" >> $GITHUB_STEP_SUMMARY
+          echo "All changes must include changelog entries as per AGENTS.md policy." >> $GITHUB_STEP_SUMMARY
+          echo "Use \`node scripts/create-changelog.cjs\` to generate compliant entries." >> $GITHUB_STEP_SUMMARY
+
+      - name: ✅ Build success notification
+        if: ${{ needs.build-api.result == 'success' && needs.build-ui.result == 'success' && needs.build-extension.result == 'success' }}
+        run: |
+          echo "🎉 All builds completed successfully!"
+          echo "✅ Ready for testing and review pipeline."
+
+      - name: ❌ Build failure notification
+        if: ${{ needs.build-api.result == 'failure' || needs.build-ui.result == 'failure' || needs.build-extension.result == 'failure' }}
+        run: |
+          echo "❌ One or more builds failed!"
+          echo "🔍 Check individual job logs for details."
+          exit 1

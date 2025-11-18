@@ -1,0 +1,207 @@
+# .github/workflows/changelog-policy.yml
+
+name: 📋 Changelog Policy Enforcement
+
+on:
+  pull_request:
+    branches: [staging]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "18"
+
+jobs:
+  validate-changelog:
+    name: 📋 Validate Changelog Entry
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history for proper diff comparison
+          fetch-depth: 0
+
+      - name: 📋 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - name: 📦 Install dependencies (if any)
+        run: |
+          # Install only if package.json exists and has dependencies
+          if [ -f "package.json" ] && grep -q '"dependencies"\|"devDependencies"' package.json; then
+            npm ci --ignore-scripts || npm install --ignore-scripts
+          else
+            echo "No package.json dependencies to install"
+          fi
+
+      - name: 🔍 Validate changelog policy compliance
+        id: validate
+        run: |
+          echo "Running changelog validation..."
+
+          # Set git config for actions
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+
+          # Run validation script
+          if node scripts/validate-changelog.cjs; then
+            echo "validation_result=success" >> $GITHUB_OUTPUT
+            echo "✅ Changelog validation passed"
+          else
+            echo "validation_result=failure" >> $GITHUB_OUTPUT
+            echo "❌ Changelog validation failed"
+            exit 1
+          fi
+
+      - name: 📊 Generate validation summary
+        if: always()
+        run: |
+          echo "# 📋 Changelog Policy Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Result:** ${{ steps.validate.outputs.validation_result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.validate.outputs.validation_result }}" = "success" ]; then
+            echo "✅ **Status:** All changes comply with changelog policy" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The following requirements were verified:" >> $GITHUB_STEP_SUMMARY
+            echo "- Significant changes include appropriate changelog entries" >> $GITHUB_STEP_SUMMARY
+            echo "- Changelog entries follow YYYYMMDDHHMMSS.md format" >> $GITHUB_STEP_SUMMARY
+            echo "- Changelog entries contain required sections and path comments" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Status:** Changelog policy violation detected" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## 🔧 How to Fix" >> $GITHUB_STEP_SUMMARY
+            echo "1. Create a changelog entry: \`CHANGELOG/YYYYMMDDHHMMSS.md\`" >> $GITHUB_STEP_SUMMARY
+            echo "2. Use current UTC timestamp for filename" >> $GITHUB_STEP_SUMMARY
+            echo "3. Include required sections as specified in AGENTS.md" >> $GITHUB_STEP_SUMMARY
+            echo "4. Add path comment at the top: \`<!-- CHANGELOG/filename.md -->\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "📖 **Reference:** See AGENTS.md for complete changelog policy details" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  check-changelog-format:
+    name: 🔎 Check Changelog Format
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    if: contains(github.event.pull_request.changed_files, 'CHANGELOG/') || contains(github.event.push.modified, 'CHANGELOG/')
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📋 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 🔎 Validate changelog format
+        run: |
+          echo "Checking changelog file format compliance..."
+
+          # Find changelog files in the current PR/push
+          changelog_files=$(find CHANGELOG/ -name "*.md" -newer .git/FETCH_HEAD 2>/dev/null || true)
+
+          if [ -z "$changelog_files" ]; then
+            echo "No new changelog files to validate"
+            exit 0
+          fi
+
+          echo "Found changelog files to validate:"
+          echo "$changelog_files"
+
+          # Validate each changelog file
+          for file in $changelog_files; do
+            echo "Validating: $file"
+            
+            # Check filename format
+            filename=$(basename "$file" .md)
+            if ! [[ $filename =~ ^[0-9]{14}(-.*)?$ ]]; then
+              echo "❌ Invalid filename format: $file"
+              echo "Expected format: YYYYMMDDHHMMSS.md or YYYYMMDDHHMMSS-description.md"
+              exit 1
+            fi
+            
+            # Check file content
+            if [ ! -s "$file" ]; then
+              echo "❌ Empty changelog file: $file"
+              exit 1
+            fi
+            
+            # Check for path comment
+            first_line=$(head -n1 "$file")
+            if ! [[ $first_line =~ ^\<!--\ CHANGELOG/.* ]]; then
+              echo "❌ Missing path comment at the beginning of: $file"
+              echo "Expected: <!-- CHANGELOG/$(basename $file) -->"
+              exit 1
+            fi
+            
+            echo "✅ Format validation passed: $file"
+          done
+
+          echo "✅ All changelog files are properly formatted"
+
+  changelog-policy-summary:
+    name: 📋 Changelog Policy Summary
+    runs-on: ubuntu-latest
+    permissions: {}
+    needs: [validate-changelog, check-changelog-format]
+    if: always()
+
+    steps:
+      - name: 📊 Generate policy compliance report
+        run: |
+          echo "# 📋 Changelog Policy Compliance Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Date:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "- **Changelog Entry Validation:** ${{ needs.validate-changelog.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Format Validation:** ${{ needs.check-changelog-format.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Determine overall status
+          if [ "${{ needs.validate-changelog.result }}" = "success" ] && \
+             ([ "${{ needs.check-changelog-format.result }}" = "success" ] || [ "${{ needs.check-changelog-format.result }}" = "skipped" ]); then
+            echo "✅ **Overall Status:** COMPLIANT" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All changelog policy requirements are satisfied." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Overall Status:** NON-COMPLIANT" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "One or more changelog policy requirements were not met." >> $GITHUB_STEP_SUMMARY
+            echo "Please review the individual job outputs for specific issues." >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Policy Reference" >> $GITHUB_STEP_SUMMARY
+          echo "📖 Complete changelog policy documentation: [AGENTS.md](https://github.com/${{ github.repository }}/blob/main/AGENTS.md#pol%C3%ADtica-de-changelogs-obrigat%C3%B3rios)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔧 For assistance with changelog creation, see the examples in the \`CHANGELOG/\` directory." >> $GITHUB_STEP_SUMMARY
+
+      - name: 🎉 Success notification
+        if: needs.validate-changelog.result == 'success' && (needs.check-changelog-format.result == 'success' || needs.check-changelog-format.result == 'skipped')
+        run: |
+          echo "🎉 Changelog policy compliance verified successfully!"
+          echo "✅ This PR/push meets all changelog requirements."
+
+      - name: 🚫 Failure notification
+        if: needs.validate-changelog.result != 'success' || (needs.check-changelog-format.result != 'success' && needs.check-changelog-format.result != 'skipped')
+        run: |
+          echo "🚫 Changelog policy compliance failed!"
+          echo "❌ This PR/push does not meet changelog requirements."
+          echo "📋 Please add or fix the required changelog entry."
+          exit 1
