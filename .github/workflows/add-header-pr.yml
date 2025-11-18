@@ -1,0 +1,144 @@
+# .github/workflows/add-header-pr.yml
+name: add-header-pr
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches:
+      - main
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
+    steps:
+      - name: Verificar mergeabilidade e checks
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              core.setFailed('Sem PR no contexto.');
+              return;
+            }
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = pr.number;
+
+            const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+            const maxAttempts = 6;
+            let attempt = 0;
+            let current = pr;
+
+            while (attempt < maxAttempts && (!current.mergeable_state || current.mergeable_state === 'unknown')) {
+              attempt++;
+              core.info(`mergeable_state=${current.mergeable_state ?? 'null'} — aguardando cálculo (${attempt}/${maxAttempts}).`);
+              await sleep(5000);
+              const refreshed = await github.rest.pulls.get({ owner, repo, pull_number });
+              current = refreshed.data;
+            }
+
+            if (current.state !== 'open') {
+              core.setFailed('PR fechado.');
+              return;
+            }
+
+            if (current.mergeable === false) {
+              core.setFailed('PR não mergeável.');
+              return;
+            }
+
+            const allowedStates = new Set(['clean', 'has_hooks', 'blocked', 'unstable']);
+            if (!current.mergeable_state) {
+              core.setFailed('Não foi possível determinar mergeable_state do PR.');
+              return;
+            }
+
+            if (!allowedStates.has(current.mergeable_state)) {
+              core.setFailed(`PR não limpo para merge (mergeable_state=${current.mergeable_state}).`);
+              return;
+            }
+
+            if (current.mergeable_state === 'unstable') {
+              const ref = current.head?.sha ?? pr.head?.sha;
+              if (!ref) {
+                core.warning('mergeable_state=unstable mas não foi possível identificar o SHA do head. Prosseguindo.');
+                return;
+              }
+
+              const failingConclusions = new Set(['failure', 'timed_out', 'cancelled', 'action_required', 'stale', 'startup_failure']);
+
+              const { data: combined } = await github.rest.repos.getCombinedStatusForRef({ owner, repo, ref });
+              const failingStatuses = combined.statuses.filter(status => status.state === 'failure' || status.state === 'error');
+
+              let page = 1;
+              const checkRuns = [];
+              while (true) {
+                const { data: checks } = await github.rest.checks.listForRef({ owner, repo, ref, per_page: 100, page });
+                checkRuns.push(...checks.check_runs);
+                if (checks.check_runs.length < 100) break;
+                page++;
+              }
+
+              const failingChecks = checkRuns.filter(run => run.conclusion && failingConclusions.has(run.conclusion));
+
+              if (failingStatuses.length > 0 || failingChecks.length > 0) {
+                const contexts = [
+                  ...failingStatuses.map(status => status.context),
+                  ...failingChecks.map(run => run.name)
+                ];
+                core.setFailed(`Checks falharam para o PR: ${contexts.join(', ')}`);
+                return;
+              }
+
+              core.info('mergeable_state=unstable mas sem checks falhos. Prosseguindo.');
+            }
+
+  run:
+    runs-on: ubuntu-latest
+    needs: guard
+    if: ${{ success() }}
+    steps:
+      - name: Checkout (histórico completo)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Config Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Instalar dependências
+        run: |
+          npm ci || npm i
+
+      - name: Aplicar cabeçalhos nos arquivos do PR
+        env:
+          OPENROUTER_TOKEN: ${{ secrets.KEY_AGENT_RELATIVE_PATH }}
+          USE_OPENROUTER: ${{ vars.USE_OPENROUTER || 'false' }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          npx ts-node tools/openrouter/add-headers-pr.ts
+
+      - name: Push na branch do PR (se houve mudanças)
+        run: |
+          if ! git diff --quiet; then
+            git add -A
+            git commit -m "chore(headers): inserir cabeçalhos relativos nos arquivos do PR"
+            git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+          else
+            echo "Sem mudanças."
+          fi

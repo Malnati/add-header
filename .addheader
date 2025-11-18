@@ -1,0 +1,13 @@
+# .addheader
+node_modules/
+dist/
+coverage/
+**/*.json
+**/*.lock
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.svg
+**/*.ico
+**/*.pdf
+**/*.map
